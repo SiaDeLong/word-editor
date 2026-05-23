@@ -103,8 +103,10 @@ export default function TextEditor() {
             if (editorRef.current) {
               editorRef.current.innerHTML = version.content;
             }
-            socketRef.current.emit('edit', { content: version.content });
-            socketRef.current.emit('save-history', { content: version.content });
+            socketRef.current.emit('restore-history', { 
+              content: version.content,
+              reviewed: version.reviewed || []
+            });
             setShowHistoryModal(false);
           }}
           onClose={() => setShowHistoryModal(false)}
@@ -119,6 +121,7 @@ export default function TextEditor() {
           userId={userId}
           setWordCount={setWordCount}
           onSelectionChange={handleSelectionChange}
+          reviewed={reviewed}
         />
 
         <Sidebar

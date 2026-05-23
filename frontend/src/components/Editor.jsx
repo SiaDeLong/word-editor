@@ -6,14 +6,15 @@ export default function Editor({
   userCursors,
   userId,
   setWordCount,
-  onSelectionChange
+  onSelectionChange,
+  reviewed
 }) {
   return (
     <div className="editor-area">
       <div
         ref={editorRef}
         contentEditable
-        onInput={(e) => handleContentChange(e, socketRef, setWordCount)}
+        onInput={(e) => handleContentChange(e, socketRef, setWordCount, reviewed)}
         onMouseUp={() => {
           handleCursorMove(editorRef, socketRef);
           onSelectionChange?.();

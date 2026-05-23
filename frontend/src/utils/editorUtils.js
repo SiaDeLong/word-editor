@@ -1,4 +1,16 @@
-export const handleContentChange = (e, socketRef, setWordCount) => {
+// Helper function to calculate character position consistently using toString
+const getCharacterPosition = (editorRef, range, isEnd = false) => {
+  const preCaretRange = range.cloneRange();
+  preCaretRange.selectNodeContents(editorRef.current);
+  if (isEnd) {
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+  } else {
+    preCaretRange.setEnd(range.startContainer, range.startOffset);
+  }
+  return preCaretRange.toString().length;
+};
+
+export const handleContentChange = (e, socketRef, setWordCount, reviewed) => {
   const newContent = e.currentTarget.innerHTML;
   socketRef.current.emit('edit', { content: newContent });
   
@@ -8,7 +20,7 @@ export const handleContentChange = (e, socketRef, setWordCount) => {
 
   clearTimeout(window.historyTimeout);
   window.historyTimeout = setTimeout(() => {
-    socketRef.current.emit('save-history', { content: newContent });
+    socketRef.current.emit('save-history', { content: newContent, reviewed: reviewed || [] });
   }, 2000);
 };
 
@@ -41,13 +53,10 @@ export const markAsReviewed = (editorRef, socketRef, reviewed, userName) => {
   const selection = window.getSelection();
   if (selection.toString().length === 0) return;
 
-  const selectedText = selection.toString();
   const range = selection.getRangeAt(0);
-  const preCaretRange = range.cloneRange();
-  preCaretRange.selectNodeContents(editorRef.current);
-  preCaretRange.setEnd(range.startContainer, range.startOffset);
-  const start = preCaretRange.toString().length;
-  const end = start + selectedText.length;
+  
+  const start = getCharacterPosition(editorRef, range, false);
+  const end = getCharacterPosition(editorRef, range, true);
 
   const alreadyReviewed = reviewed.some(rev => rev.start === start && rev.end === end);
 
@@ -58,7 +67,7 @@ export const markAsReviewed = (editorRef, socketRef, reviewed, userName) => {
       id: `${Date.now()}-${Math.random()}`,
       start,
       end,
-      text: selectedText,
+      text: selection.toString(),
       reviewedBy: userName
     });
   }
@@ -71,15 +80,12 @@ export const handleSelectForComment = (editorRef, setSelectedRange, setShowComme
     return;
   }
 
-  const selectedText = selection.toString();
   const range = selection.getRangeAt(0);
-  const preCaretRange = range.cloneRange();
-  preCaretRange.selectNodeContents(editorRef.current);
-  preCaretRange.setEnd(range.startContainer, range.startOffset);
-  const start = preCaretRange.toString().length;
-  const end = start + selectedText.length;
+  
+  const start = getCharacterPosition(editorRef, range, false);
+  const end = getCharacterPosition(editorRef, range, true);
 
-  setSelectedRange({ start, end, text: selectedText });
+  setSelectedRange({ start, end, text: selection.toString() });
   setShowCommentBox(true);
 };
 
