@@ -144,7 +144,26 @@ io.on('connection', (socket) => {
     if (!currentDocId) return;
     const doc = documents.get(currentDocId);
     if (doc) {
-      doc.reviewed = data;
+      // Merge the updated ranges
+      const mergeReviewRanges = (ranges) => {
+        if (ranges.length === 0) return [];
+        const sorted = [...ranges].sort((a, b) => a.start - b.start);
+        const merged = [];
+        let current = { ...sorted[0] };
+        for (let i = 1; i < sorted.length; i++) {
+          const next = sorted[i];
+          if (next.start <= current.end) {
+            current.end = Math.max(current.end, next.end);
+          } else {
+            merged.push(current);
+            current = { ...next };
+          }
+        }
+        merged.push(current);
+        return merged;
+      };
+      
+      doc.reviewed = mergeReviewRanges(data);
       io.to(currentDocId).emit('reviewed-update', doc.reviewed);
     }
   });
