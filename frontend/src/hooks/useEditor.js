@@ -84,6 +84,20 @@ export const useEditor = () => {
     if (!editorRef.current || reviewed.length === 0) return;
 
     try {
+      // Save cursor position before modifying DOM
+      const selection = window.getSelection();
+      let cursorPos = 0;
+      let hasCursor = false;
+      
+      if (selection.rangeCount > 0 && editorRef.current.contains(selection.anchorNode)) {
+        const range = selection.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(editorRef.current);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        cursorPos = preCaretRange.toString().length;
+        hasCursor = true;
+      }
+
       // First, remove all existing marks
       const existingMarks = editorRef.current.querySelectorAll('mark');
       existingMarks.forEach(mark => {
@@ -166,6 +180,42 @@ export const useEditor = () => {
 
         node.parentNode.replaceChild(fragment, node);
       });
+
+      // Restore cursor position after DOM modifications
+      if (hasCursor) {
+        const newRange = document.createRange();
+        const newSelection = window.getSelection();
+        let charCount = 0;
+        let found = false;
+
+        const traverse = (node) => {
+          if (found) return;
+
+          if (node.nodeType === Node.TEXT_NODE) {
+            const nodeLength = node.textContent.length;
+            if (charCount + nodeLength >= cursorPos) {
+              const offset = cursorPos - charCount;
+              newRange.setStart(node, Math.min(offset, node.textContent.length));
+              newRange.collapse(true);
+              found = true;
+              return;
+            }
+            charCount += nodeLength;
+          } else {
+            for (let child of node.childNodes) {
+              traverse(child);
+              if (found) return;
+            }
+          }
+        };
+
+        traverse(editorRef.current);
+
+        if (found) {
+          newSelection.removeAllRanges();
+          newSelection.addRange(newRange);
+        }
+      }
     } catch (error) {
       console.error('Error applying review highlights:', error);
     }
@@ -194,6 +244,8 @@ export const useEditor = () => {
       setUserName(data.userName);
       if (editorRef.current) {
         editorRef.current.innerHTML = data.content;
+        // Initialize lastContentRef with the loaded content
+        lastContentRef.current = data.content;
       }
     });
 
@@ -242,6 +294,7 @@ export const useEditor = () => {
   return {
     content,
     reviewed,
+    setReviewed,
     comments,
     history,
     userCursors,
@@ -251,6 +304,8 @@ export const useEditor = () => {
     wordCount,
     setWordCount,
     editorRef,
-    socketRef
+    socketRef,
+    adjustReviewRanges,
+    lastContentRef
   };
 };

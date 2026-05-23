@@ -13,6 +13,7 @@ export default function TextEditor() {
   const {
     content,
     reviewed,
+    setReviewed,
     comments,
     history,
     userCursors,
@@ -22,7 +23,9 @@ export default function TextEditor() {
     wordCount,
     setWordCount,
     editorRef,
-    socketRef
+    socketRef,
+    adjustReviewRanges,
+    lastContentRef
   } = useEditor();
 
   const [commentText, setCommentText] = useState('');
@@ -122,6 +125,25 @@ export default function TextEditor() {
           setWordCount={setWordCount}
           onSelectionChange={handleSelectionChange}
           reviewed={reviewed}
+          onContentChange={(newContent) => {
+            const oldContent = lastContentRef.current;
+            if (oldContent && oldContent !== newContent) {
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = newContent;
+              const newText = tempDiv.textContent;
+              
+              const tempDiv2 = document.createElement('div');
+              tempDiv2.innerHTML = oldContent;
+              const oldText = tempDiv2.textContent;
+              
+              const adjustedReviewed = adjustReviewRanges(oldText, newText, reviewed);
+              if (JSON.stringify(adjustedReviewed) !== JSON.stringify(reviewed)) {
+                setReviewed(adjustedReviewed);
+                socketRef.current.emit('update-reviewed-ranges', adjustedReviewed);
+              }
+            }
+            lastContentRef.current = newContent;
+          }}
         />
 
         <Sidebar
