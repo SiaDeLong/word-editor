@@ -44,7 +44,8 @@ export const handleJoinDocument = (socket, io, docId, userId, userColor, userNam
 
       documents.set(docId, {
         content: demoContent,
-        reviewed: []
+        reviewed: [],
+        version: 0
       });
       comments.set(docId, []);
       history.set(docId, [{ content: demoContent, reviewed: [], timestamp: Date.now() }]);
@@ -62,7 +63,8 @@ export const handleJoinDocument = (socket, io, docId, userId, userColor, userNam
     history: history.get(docId),
     userId,
     userColor,
-    userName
+    userName,
+    version: doc.version
   });
 
   if (!userCursors.has(docId)) {
@@ -81,11 +83,31 @@ export const handleEdit = (socket, io, docId, data, userId, documents, history) 
   if (!docId) return;
 
   const doc = documents.get(docId);
-  doc.content = data.content;
+  
+  // Check if edit is based on current version
+  if (data.baseVersion !== undefined && data.baseVersion !== doc.version) {
+    // Conflict detected - send current state back
+    socket.emit('conflict-detected', {
+      currentContent: doc.content,
+      currentVersion: doc.version
+    });
+    return;
+  }
 
+  // Apply edit
+  doc.content = data.content;
+  doc.version = (doc.version || 0) + 1;
+
+  // Send acknowledgment to sender with new version
+  socket.emit('edit-accepted', {
+    version: doc.version
+  });
+
+  // Broadcast to OTHER users only
   socket.to(docId).emit('content-update', {
     content: data.content,
-    userId: userId
+    userId: userId,
+    version: doc.version
   });
 };
 

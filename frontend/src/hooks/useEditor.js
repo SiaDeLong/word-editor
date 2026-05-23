@@ -14,30 +14,23 @@ export const useEditor = () => {
   const editorRef = useRef(null);
   const socketRef = useRef(null);
   const lastContentRef = useRef('');
+  const versionRef = useRef(0);
 
-  // Merge overlapping review ranges into continuous intervals
+  // Merge overlapping review ranges (imported from backend utils)
   const mergeReviewRanges = (ranges) => {
     if (ranges.length === 0) return [];
-    
-    // Sort by start position
     const sorted = [...ranges].sort((a, b) => a.start - b.start);
-    
     const merged = [];
     let current = { ...sorted[0] };
-    
     for (let i = 1; i < sorted.length; i++) {
       const next = sorted[i];
-      
-      // If ranges overlap or are adjacent, merge them
       if (next.start <= current.end) {
         current.end = Math.max(current.end, next.end);
       } else {
-        // No overlap, save current and start new
         merged.push(current);
         current = { ...next };
       }
     }
-    
     merged.push(current);
     return merged;
   };
@@ -269,32 +262,129 @@ export const useEditor = () => {
       setUserId(data.userId);
       setUserColor(data.userColor);
       setUserName(data.userName);
+      versionRef.current = data.version || 0;
       if (editorRef.current) {
         editorRef.current.innerHTML = data.content;
-        // Initialize lastContentRef with the loaded content
         lastContentRef.current = data.content;
       }
     });
 
+    socketRef.current.on('edit-accepted', (data) => {
+      // Server accepted our edit, update version
+      versionRef.current = data.version;
+    });
+
     socketRef.current.on('content-update', (data) => {
+      // Only update content from OTHER users
       if (data.userId !== userId && editorRef.current) {
-        const oldContent = editorRef.current.textContent;
-        // Extract text content from HTML to compare properly
+        const oldContent = lastContentRef.current;
+        const newContent = data.content;
+        
+        // Save cursor position before updating content
+        const selection = window.getSelection();
+        let cursorPos = 0;
+        let hasCursor = false;
+        
+        if (selection.rangeCount > 0 && editorRef.current.contains(selection.anchorNode)) {
+          const range = selection.getRangeAt(0);
+          const preCaretRange = range.cloneRange();
+          preCaretRange.selectNodeContents(editorRef.current);
+          preCaretRange.setEnd(range.endContainer, range.endOffset);
+          cursorPos = preCaretRange.toString().length;
+          hasCursor = true;
+        }
+        
+        // Extract text content to compare for review range adjustment
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = data.content;
-        const newContent = tempDiv.textContent;
+        tempDiv.innerHTML = oldContent;
+        const oldText = tempDiv.textContent;
+        
+        const tempDiv2 = document.createElement('div');
+        tempDiv2.innerHTML = newContent;
+        const newText = tempDiv2.textContent;
         
         // Adjust review ranges based on content change
-        const adjustedReviewed = adjustReviewRanges(oldContent, newContent, reviewed);
+        const adjustedReviewed = adjustReviewRanges(oldText, newText, reviewed);
         if (JSON.stringify(adjustedReviewed) !== JSON.stringify(reviewed)) {
           setReviewed(adjustedReviewed);
-          // Emit updated review ranges to all users
+          // Emit updated review ranges to server
           socketRef.current.emit('update-reviewed-ranges', adjustedReviewed);
         }
         
-        setContent(data.content);
-        editorRef.current.innerHTML = data.content;
+        // Calculate cursor position shift based on content change
+        let newCursorPos = cursorPos;
+        if (hasCursor && oldText !== newText) {
+          // Find where the change occurred
+          let diffStart = 0;
+          while (diffStart < oldText.length && diffStart < newText.length && oldText[diffStart] === newText[diffStart]) {
+            diffStart++;
+          }
+          
+          const oldLength = oldText.length;
+          const newLength = newText.length;
+          const lengthDiff = newLength - oldLength;
+          
+          // If cursor is after the change, shift it
+          if (cursorPos > diffStart) {
+            newCursorPos = Math.max(diffStart, cursorPos + lengthDiff);
+          }
+        }
+        
+        setContent(newContent);
+        editorRef.current.innerHTML = newContent;
+        lastContentRef.current = newContent;
+        
+        // Restore cursor position
+        if (hasCursor) {
+          const newRange = document.createRange();
+          const newSelection = window.getSelection();
+          let charCount = 0;
+          let found = false;
+
+          const traverse = (node) => {
+            if (found) return;
+
+            if (node.nodeType === Node.TEXT_NODE) {
+              const nodeLength = node.textContent.length;
+              if (charCount + nodeLength >= newCursorPos) {
+                const offset = newCursorPos - charCount;
+                newRange.setStart(node, Math.min(offset, node.textContent.length));
+                newRange.collapse(true);
+                found = true;
+                return;
+              }
+              charCount += nodeLength;
+            } else {
+              for (let child of node.childNodes) {
+                traverse(child);
+                if (found) return;
+              }
+            }
+          };
+
+          traverse(editorRef.current);
+
+          if (found) {
+            newSelection.removeAllRanges();
+            newSelection.addRange(newRange);
+          }
+        }
+        
+        // Update version from server
+        versionRef.current = data.version || versionRef.current + 1;
       }
+    });
+
+    socketRef.current.on('conflict-detected', (data) => {
+      // Conflict detected - server rejected our edit
+      // Sync to server's version
+      versionRef.current = data.currentVersion;
+      setContent(data.currentContent);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = data.currentContent;
+        lastContentRef.current = data.currentContent;
+      }
+      alert('Your edit conflicted with another user. Document has been synced to latest version.');
     });
 
     socketRef.current.on('cursor-positions', (positions) => {
@@ -332,7 +422,9 @@ export const useEditor = () => {
     setWordCount,
     editorRef,
     socketRef,
+    lastContentRef,
+    mergeReviewRanges,
     adjustReviewRanges,
-    lastContentRef
+    versionRef
   };
 };

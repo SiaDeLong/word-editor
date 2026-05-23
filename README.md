@@ -44,27 +44,28 @@ A real-time collaborative text editor with support for multiple users, formattin
 
 ### Installation & Running
 
-Install dependencies for both frontend and backend:
+1. **Install dependencies:**
+   ```bash
+   npm run install-all
+   ```
 
-```bash
-npm run install-all
-```
+2. **Start the application:**
+   ```bash
+   npm run dev
+   ```
+   Or use the provided batch file on Windows:
+   ```bash
+   start-dev.bat
+   ```
 
-Start both backend and frontend servers:
+3. **Open in browser:**
+   Navigate to `http://localhost:5173`
 
-```bash
-npm run dev
-```
+That's it! The backend runs on `http://localhost:3000` and frontend on `http://localhost:5173`.
 
-This will:
-1. Start the Express backend server on `http://localhost:3000`
-2. Start the Vite development server on `http://localhost:5173`
+### Test Collaboration
 
-Open your browser and navigate to `http://localhost:5173` to access the editor.
-
-### Multiple Users
-
-To test collaborative editing, open the application in multiple browser tabs or windows. Changes made in one tab will appear in real-time in all other tabs.
+Open the application in multiple browser tabs or windows to see real-time collaboration in action.
 
 ## Usage
 
@@ -94,6 +95,15 @@ To test collaborative editing, open the application in multiple browser tabs or 
 ### Active Users
 - The sidebar displays active users and their current cursor positions
 - See in real-time where other collaborators are working
+
+## Screenshots
+
+Add screenshots of the running application here:
+
+- **Main Editor View**: [Add screenshot]
+- **Collaboration in Action**: [Add screenshot]
+- **Comments & Reviews**: [Add screenshot]
+- **History Panel**: [Add screenshot]
 
 ## Architecture
 

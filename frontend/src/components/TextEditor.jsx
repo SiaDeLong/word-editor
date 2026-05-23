@@ -24,8 +24,9 @@ export default function TextEditor() {
     setWordCount,
     editorRef,
     socketRef,
+    lastContentRef,
     adjustReviewRanges,
-    lastContentRef
+    versionRef
   } = useEditor();
 
   const [commentText, setCommentText] = useState('');
@@ -125,6 +126,7 @@ export default function TextEditor() {
           setWordCount={setWordCount}
           onSelectionChange={handleSelectionChange}
           reviewed={reviewed}
+          versionRef={versionRef}
           onContentChange={(newContent) => {
             const oldContent = lastContentRef.current;
             if (oldContent && oldContent !== newContent) {

@@ -8,7 +8,8 @@ export default function Editor({
   setWordCount,
   onSelectionChange,
   reviewed,
-  onContentChange
+  onContentChange,
+  versionRef
 }) {
   return (
     <div className="editor-area">
@@ -16,7 +17,7 @@ export default function Editor({
         ref={editorRef}
         contentEditable
         onInput={(e) => {
-          handleContentChange(e, socketRef, setWordCount, reviewed);
+          handleContentChange(e, socketRef, setWordCount, reviewed, versionRef);
           onContentChange?.(e.currentTarget.innerHTML);
         }}
         onMouseUp={() => {

@@ -9,6 +9,7 @@ import { handleJoinDocument, handleEdit, handleSaveHistory } from './handlers/do
 import { handleCursorMove, handleDisconnect } from './handlers/cursorHandler.js';
 import { handleMarkReviewed, handleUnmarkReviewed } from './handlers/reviewHandler.js';
 import { handleAddComment, handleAddReply } from './handlers/commentHandler.js';
+import { mergeReviewRanges } from './utils/reviewUtils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, 'data');
@@ -38,6 +39,7 @@ const userCursors = new Map();
 const comments = new Map();
 const history = new Map();
 const userMap = new Map();
+const documentVersions = new Map(); // Track version for conflict detection
 let userCounter = 0;
 
 const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
@@ -144,25 +146,6 @@ io.on('connection', (socket) => {
     if (!currentDocId) return;
     const doc = documents.get(currentDocId);
     if (doc) {
-      // Merge the updated ranges
-      const mergeReviewRanges = (ranges) => {
-        if (ranges.length === 0) return [];
-        const sorted = [...ranges].sort((a, b) => a.start - b.start);
-        const merged = [];
-        let current = { ...sorted[0] };
-        for (let i = 1; i < sorted.length; i++) {
-          const next = sorted[i];
-          if (next.start <= current.end) {
-            current.end = Math.max(current.end, next.end);
-          } else {
-            merged.push(current);
-            current = { ...next };
-          }
-        }
-        merged.push(current);
-        return merged;
-      };
-      
       doc.reviewed = mergeReviewRanges(data);
       io.to(currentDocId).emit('reviewed-update', doc.reviewed);
     }

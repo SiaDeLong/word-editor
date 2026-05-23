@@ -10,13 +10,27 @@ const getCharacterPosition = (editorRef, range, isEnd = false) => {
   return preCaretRange.toString().length;
 };
 
-export const handleContentChange = (e, socketRef, setWordCount, reviewed) => {
+export const handleContentChange = (e, socketRef, setWordCount, reviewed, versionRef) => {
   const newContent = e.currentTarget.innerHTML;
-  socketRef.current.emit('edit', { content: newContent });
+  socketRef.current.emit('edit', { 
+    content: newContent,
+    baseVersion: versionRef.current
+  });
   
   const text = e.currentTarget.textContent;
   const words = text.trim().split(/\s+/).filter(word => word.length > 0).length;
   setWordCount(words);
+
+  // Also send cursor position on every keystroke for real-time tracking
+  const selection = window.getSelection();
+  if (selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(e.currentTarget);
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+    const pos = preCaretRange.toString().length;
+    socketRef.current.emit('cursor-move', { position: pos });
+  }
 
   clearTimeout(window.historyTimeout);
   window.historyTimeout = setTimeout(() => {
@@ -35,9 +49,10 @@ export const handleCursorMove = (editorRef, socketRef) => {
       const pos = preCaretRange.toString().length;
       
       clearTimeout(window.cursorTimeout);
+      // Reduced debounce to 100ms for more responsive cursor tracking
       window.cursorTimeout = setTimeout(() => {
         socketRef.current.emit('cursor-move', { position: pos });
-      }, 300);
+      }, 100);
     }
   }
 };
